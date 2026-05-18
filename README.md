@@ -87,80 +87,92 @@ Context-Aware-RAG-GeminiAI/
 
 ## 🚀 Execution & Setup Guide
 
-### 1. Backend Server Deployment
+### 1. Backend Server
 
 #### Environment Setup
-Ensure you copy and configure the backend environment variables first:
+Copy and populate the environment file inside `backend/`:
 ```powershell
 cd backend
 copy .env.example .env
 ```
-Populate `.env` with your Neon database URL, Gemini API credentials, and Cloudinary keys:
+
+Edit `.env` with your credentials:
 ```env
 DATABASE_URL=postgresql://neondb_owner:YOUR_PASS@YOUR_NEON_HOST.us-east-1.aws.neon.tech/neondb?sslmode=require
 GEMINI_API_KEY=AIzaSy...
 CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
+API_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:3000
+LOG_LEVEL=INFO
 ```
-*Note: If `DATABASE_URL` is left blank, the system automatically falls back to local SQLite RAG.*
 
-#### Initialize & Activate Virtual Environment
-Choose the activation script based on your active terminal shell:
+> If `DATABASE_URL` is left blank, the system automatically falls back to a local SQLite database.
 
-* **Windows PowerShell**:
-  ```powershell
-  # If you get a policy execution error, run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
-  .\.venv\Scripts\Activate.ps1
-  ```
+#### Create Virtual Environment & Install Dependencies
+Run these once from inside the `backend/` directory:
 
-* **Windows Command Prompt (CMD)**:
-  ```cmd
-  .\.venv\Scripts\activate.bat
-  ```
+```powershell
+python -m venv .venv
+```
 
-* **Git Bash / Linux / macOS**:
-  ```bash
-  source .venv/Scripts/activate
-  ```
+Activate the environment:
 
-Once activated, install project dependencies:
+| Shell | Command |
+|-------|---------|
+| **Windows PowerShell** | `.\.venv\Scripts\Activate.ps1` |
+| **Windows CMD** | `.\.venv\Scripts\activate.bat` |
+| **Git Bash / macOS / Linux** | `source .venv/Scripts/activate` |
+
+> If PowerShell blocks activation, first run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process`
+
+Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-#### Launch Backend Server
-With the virtual environment activated, boot the FastAPI server using Uvicorn:
-```bash
+#### Launch the Backend
+Run from inside the `backend/` directory with the venv active:
+
+**Windows PowerShell:**
+```powershell
+$env:PYTHONUTF8 = "1"
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
+**Git Bash / macOS / Linux:**
+```bash
+PYTHONUTF8=1 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+> `PYTHONUTF8=1` is required on Windows to prevent encoding errors from emoji characters in log output.
+
+The API will be available at **`http://127.0.0.1:8000`**  
+Interactive API docs (Swagger UI): **`http://127.0.0.1:8000/docs`**
 
 ---
 
-### 2. Frontend Dashboard Setup
+### 2. Frontend Dashboard
 
 #### Environment Setup
-Ensure you copy and configure the frontend environment variables:
+From inside the `frontend/` directory:
 ```powershell
-cd ../frontend
 copy .env.example .env
 ```
-Populate `.env` with the URL of your local/deployed FastAPI server:
+
+Edit `.env`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-#### Install Packages & Launch Dev Server
+#### Install & Run
 ```powershell
-# Install Node modules
 npm install
-
-# Run Next.js Turbopack development server
 npm run dev
 ```
 
-Open **`http://localhost:3000`** in your browser to interact with the Zynaptrix Context-Aware RAG platform!
+Open **`http://localhost:3000`** in your browser to interact with the Zynaptrix platform!
 
 ---
 

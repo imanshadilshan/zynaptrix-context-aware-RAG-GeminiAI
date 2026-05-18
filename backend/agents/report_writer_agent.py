@@ -1,7 +1,10 @@
-import google.generativeai as genai
 import json
 from unified_rag.config import settings
+from unified_rag.gemini_client import get_client
+from google.genai import types
 import typing_extensions as typing
+
+MODEL = "gemini-2.5-flash"
 
 class ReportSchema(typing.TypedDict):
     machine_id: str
@@ -21,13 +24,8 @@ class ReportWriterAgent:
     """
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
 
     def write_report(self, chat_transcript: str, machine_id: str = "Unknown", manual_id: str = "Unknown") -> dict:
-        """
-        Parses dialogue transcript and outputs structured maintenance report JSON.
-        """
         if not self.api_key:
             return {
                 "machine_id": machine_id,
@@ -41,9 +39,6 @@ class ReportWriterAgent:
                 "status": "ESCALATED"
             }
 
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
         prompt = (
             "You are an expert technical documenter. Review the following chat transcript between a field technician "
             "and a diagnostic copilot. Extract a structured maintenance and resolution report in valid JSON.\n\n"
@@ -54,22 +49,22 @@ class ReportWriterAgent:
         )
 
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = get_client().models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=ReportSchema,
                     temperature=0.0
                 )
             )
             report_data = json.loads(response.text)
-            
-            # Ensure identifiers are populated if missing in transcript extraction
+
             if report_data.get("machine_id") in ["", "Unknown", None]:
                 report_data["machine_id"] = machine_id
             if report_data.get("manual_id") in ["", "Unknown", None]:
                 report_data["manual_id"] = manual_id
-                
+
             return report_data
         except Exception as e:
             print(f"❌ [ReportWriterAgent] Report compilation failed: {e}")

@@ -8,9 +8,8 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-import google.generativeai as genai
-
 from unified_rag.config import settings
+from unified_rag.gemini_client import get_client
 from unified_rag.db.database import get_db
 from unified_rag.db.models import AssistantSession, AssistantMessage, Machine, InteractionMemory
 from agents.orchestrator_agent import OrchestratorAgent
@@ -51,11 +50,12 @@ def generate_session_title(query: str) -> str:
     if not settings.gemini_api_key:
         return "New Assistant Inquiry"
     try:
-        genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        res = model.generate_content(
-            f"Generate a very short title (maximum 4 words) for a chat that starts with this question: '{query}'. "
-            "Provide ONLY the title as plain text. No quotes. No surrounding text."
+        res = get_client().models.generate_content(
+            model="gemini-2.5-flash",
+            contents=(
+                f"Generate a very short title (maximum 4 words) for a chat that starts with this question: '{query}'. "
+                "Provide ONLY the title as plain text. No quotes. No surrounding text."
+            )
         )
         return res.text.strip().strip('"')
     except Exception as e:

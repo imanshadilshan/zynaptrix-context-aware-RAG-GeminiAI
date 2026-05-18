@@ -1,13 +1,16 @@
-import google.generativeai as genai
 import json
+from google.genai import types
 from unified_rag.config import settings
 from unified_rag.db.database import SessionLocal
 from unified_rag.db.models import AssistantSession, AssistantMessage, Machine, InteractionMemory
+from unified_rag.gemini_client import get_client
 from agents.knowledge_agent import KnowledgeAgent, RAGMode
 from agents.safety_critic_agent import SafetyCriticAgent
 from agents.report_writer_agent import ReportWriterAgent
 import datetime
 import typing_extensions as typing
+
+MODEL = "gemini-2.5-flash"
 
 class ClassificationSchema(typing.TypedDict):
     intent: str # "RAG", "GUIDE", "ONBOARDING", "CHAT", "REPORT"
@@ -20,22 +23,14 @@ class OrchestratorAgent:
     """
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
         self.knowledge_agent = KnowledgeAgent()
         self.safety_critic = SafetyCriticAgent()
         self.report_writer = ReportWriterAgent()
 
     def classify_intent(self, user_query: str, chat_history: str = "") -> str:
-        """
-        Uses Gemini to classify user query intent for optimal routing.
-        """
         if not self.api_key:
             return "RAG"
-            
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
+
         prompt = (
             "You are a routing agent for an industrial AI assistant.\n"
             "Classify the following user query into one of these intents:\n"
@@ -47,11 +42,12 @@ class OrchestratorAgent:
             f"CHAT HISTORY:\n{chat_history}\n\n"
             f"USER QUERY: '{user_query}'"
         )
-        
+
         try:
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
+            response = get_client().models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     response_schema=ClassificationSchema,
                     temperature=0.0
@@ -64,31 +60,23 @@ class OrchestratorAgent:
             return "RAG"
 
     def handle_message(self, session_id: int, user_query: str) -> dict:
-        """
-        Handles stateful dialog loops.
-        Pipes queries, retrieves RAG content, audits safety, and writes to database.
-        """
         db = SessionLocal()
         try:
-            # 1. Fetch Session
             session = db.query(AssistantSession).filter(AssistantSession.id == session_id).first()
             if not session:
                 return {"error": "Session not found"}
 
-            # Resolve manual associated with the active machine context
             manual_id = "Zynaptrix_9000"
             if session.machine_id:
                 machine = db.query(Machine).filter(Machine.machine_id == session.machine_id).first()
                 if machine:
                     manual_id = machine.manual_id
 
-            # 2. Reconstruct chat history context
             messages = db.query(AssistantMessage).filter(AssistantMessage.session_id == session_id).order_by(AssistantMessage.id.asc()).all()
             history_str = ""
             for m in messages:
                 history_str += f"{m.role.upper()}: {m.content}\n"
 
-            # 3. Save User Message
             user_msg = AssistantMessage(
                 session_id=session_id,
                 role="user",
@@ -98,7 +86,6 @@ class OrchestratorAgent:
             db.add(user_msg)
             db.commit()
 
-            # 4. Intent Classification
             intent = self.classify_intent(user_query, history_str)
             print(f"🤖 [Orchestrator] Classified query intent: {intent}")
 
@@ -106,7 +93,6 @@ class OrchestratorAgent:
             wizard_step_data = None
             retrieved_images = []
 
-            # 5. Route Inquiries
             if intent == "ONBOARDING":
                 agent_response = (
                     "### 🛠️ Welcome to the Zynaptrix Industrial AI Copilot!\n"
@@ -123,7 +109,6 @@ class OrchestratorAgent:
                     "or if you have a machine repair issue to guide you through."
                 )
             elif intent == "REPORT":
-                # Compile Dialog transcript
                 chat_transcript = history_str + f"USER: {user_query}\n"
                 report_data = self.report_writer.write_report(chat_transcript, session.machine_id or "Unknown", manual_id)
                 agent_response = (
@@ -136,10 +121,8 @@ class OrchestratorAgent:
                 )
                 wizard_step_data = json.dumps(report_data)
             else:
-                # GUIDE or RAG
                 rag_mode = RAGMode.SUMMARY if intent == "RAG" else RAGMode.CONVERSATIONAL_WIZARD
-                
-                # If conversational wizard, and chat history contains steps, let's keep it structured
+
                 if "generate full step-by-step repair procedure" in user_query.lower() or "[conversational_wizard]" in user_query.lower():
                     rag_mode = RAGMode.CONVERSATIONAL_WIZARD
 
@@ -150,14 +133,11 @@ class OrchestratorAgent:
                     mode=rag_mode,
                     chat_history=history_str
                 )
-                
+
                 raw_answer = rag_res["answer"]
                 retrieved_images = rag_res["images"]
-
-                # 6. Safety Audit (Audit steps, ensure LOTO/PPE)
                 agent_response = self.safety_critic.audit_response(raw_answer)
 
-            # 7. Commit Agent Response
             agent_msg = AssistantMessage(
                 session_id=session_id,
                 role="agent",
@@ -168,8 +148,6 @@ class OrchestratorAgent:
                 timestamp=datetime.datetime.now().isoformat()
             )
             db.add(agent_msg)
-            
-            # Update Session timestamp
             session.updated_at = datetime.datetime.now().isoformat()
             db.commit()
 

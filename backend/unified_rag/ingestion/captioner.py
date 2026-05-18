@@ -1,15 +1,15 @@
-import google.generativeai as genai
 from PIL import Image
 import requests
 from io import BytesIO
 import os
 from unified_rag.config import settings
+from unified_rag.gemini_client import get_client
+
+MODEL = "gemini-2.5-flash"
 
 class ImageCaptioner:
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
 
     def generate_caption(self, image_path: str, metadata: dict = None) -> str:
         """
@@ -18,11 +18,8 @@ class ImageCaptioner:
         """
         if not self.api_key:
             print("⚠️ [Vision] Gemini API key not set. Skipping caption generation.")
-            return f"Technical diagram on Page {metadata.get('page', 'Unknown')}."
-            
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
+            return f"Technical diagram on Page {(metadata or {}).get('page', 'Unknown')}."
+
         metadata = metadata or {}
         page = metadata.get("page", "Unknown")
         section = metadata.get("section", "Unknown Section")
@@ -48,7 +45,6 @@ class ImageCaptioner:
         )
 
         try:
-            # Load the image from URL or Local Path
             if image_path.startswith("http"):
                 response = requests.get(image_path, timeout=15)
                 img = Image.open(BytesIO(response.content))
@@ -57,10 +53,13 @@ class ImageCaptioner:
                     raise FileNotFoundError(f"Local image path not found: {image_path}")
                 img = Image.open(image_path)
 
-            response = model.generate_content([prompt, img])
+            response = get_client().models.generate_content(
+                model=MODEL,
+                contents=[prompt, img]
+            )
             caption = response.text.strip()
             return f"### {label} (Context: {section})\n\n{caption}"
-            
+
         except Exception as e:
             print(f"      ❌ [Vision] Gemini Vision Call FAILED for {image_path}: {e}")
             return f"Technical diagram '{label}' on Page {page}. Description unavailable due to parsing error."

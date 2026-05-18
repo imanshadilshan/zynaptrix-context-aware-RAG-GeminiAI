@@ -1,8 +1,11 @@
 from enum import Enum
-import google.generativeai as genai
+from google.genai import types
 from unified_rag.retrieval.retriever import RetrievalEngine
 from unified_rag.db.database import SessionLocal
 from unified_rag.config import settings
+from unified_rag.gemini_client import get_client
+
+MODEL = "gemini-2.5-flash"
 
 class RAGMode(str, Enum):
     SUMMARY = "summary"
@@ -19,33 +22,23 @@ class KnowledgeAgent:
     def __init__(self):
         self.retriever = RetrievalEngine()
         self.api_key = settings.gemini_api_key
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
 
     def query(self, query: str, manual_id: str, machine_id: str = None, mode: RAGMode = RAGMode.SUMMARY, chat_history: str = "") -> dict:
-        """
-        Executes the Multimodal RAG Pipeline.
-        """
         if not self.api_key:
             return {
                 "answer": "⚠️ Gemini API key not configured. Cannot process technical inquiries.",
                 "images": [],
                 "pages": []
             }
-            
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
+
         db = None
         retrieved_data = {"text_chunks": [], "images": [], "historical_fixes": []}
-        
-        # PROVENANCE PRE-CHECK
+
         manual_missing = "[DISCLAIMER_REQUIRED: MISSING_MANUAL]" in query
         if manual_missing:
             query = query.replace("[DISCLAIMER_REQUIRED: MISSING_MANUAL]", "").strip()
 
         try:
-            # STAGE 1: SEMANTIC RETRIEVAL
             try:
                 db = SessionLocal()
                 retrieved_data = self.retriever.retrieve(db, query, manual_id, machine_id)
@@ -54,17 +47,16 @@ class KnowledgeAgent:
             finally:
                 if db:
                     db.close()
-            
-            # STAGE 2: CONTEXT BUILDER
+
             text_context = ""
             pages = set()
             image_references = []
-            
+
             for i, chunk in enumerate(retrieved_data["text_chunks"]):
                 text_context += f"--- Manual Context {i+1} (Page {chunk.page}) ---\n{chunk.content}\n\n"
                 if chunk.page is not None:
                     pages.add(chunk.page)
-            
+
             history_context = ""
             for i, fix in enumerate(retrieved_data.get("historical_fixes", [])):
                 history_context += f"--- PREVIOUS incident FIX {i+1} ({fix.timestamp}) ---\nSummary: {fix.summary}\nOperator Actions: {fix.operator_fix}\n\n"
@@ -73,8 +65,7 @@ class KnowledgeAgent:
                 if img.path:
                     image_references.append(img.path)
                 text_context += f"--- Image Description {i+1} (Page {img.page}) ---\n{img.content}\n\n"
-                
-            # STAGE 3: MODE SELECTION (Prompt Construction)
+
             if mode == RAGMode.PROCEDURE:
                 system_prompt = self._build_procedure_prompt(manual_id, text_context, history_context, image_references)
             elif mode == RAGMode.CLARIFICATION:
@@ -83,35 +74,26 @@ class KnowledgeAgent:
                 system_prompt = self._build_evaluation_prompt(manual_id, query, text_context, image_references)
             elif mode == RAGMode.CONVERSATIONAL_WIZARD:
                 system_prompt = self._build_conversational_wizard_prompt(
-                    manual_id, 
-                    query, 
-                    text_context, 
-                    history_context,
-                    image_references,
-                    chat_history,
-                    manual_missing
+                    manual_id, query, text_context, history_context, image_references, chat_history, manual_missing
                 )
             else:
                 system_prompt = self._build_summary_prompt(manual_id, text_context, history_context, manual_missing)
-            
-            # STAGE 4: LLM INFERENCE
+
             if mode == RAGMode.CLARIFICATION:
                 user_content = f"Please explain the following task in very simple, pointwise English using bullet points: '{query}'"
             elif mode == RAGMode.EVALUATION:
                 user_content = f"Please evaluate the technician's progress: '{query}'"
             else:
                 user_content = f"Technician query: '{query}'"
-                
+
             try:
-                response = model.generate_content(
-                    f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_content}",
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.1
-                    )
+                response = get_client().models.generate_content(
+                    model=MODEL,
+                    contents=f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_content}",
+                    config=types.GenerateContentConfig(temperature=0.1)
                 )
                 answer = response.text
-                
-                # INTERLEAVE IMAGE REFERENCES WITH MD TAGS
+
                 for j, img_path in enumerate(image_references):
                     web_path = img_path
                     if not img_path.startswith("http"):
@@ -123,13 +105,12 @@ class KnowledgeAgent:
                         if api_url.endswith('/'):
                             api_url = api_url[:-1]
                         web_path = f"{api_url}{web_path}"
-                    
                     answer = answer.replace(f"[IMAGE_{j}]", f"\n\n![Technical Diagram]({web_path})\n\n")
-                    
+
             except Exception as e:
                 print(f"❌ [KnowledgeAgent] Gemini call failed: {e}")
                 answer = "Error generating response from Gemini RAG."
-            
+
             return {
                 "answer": answer,
                 "images": image_references,
@@ -165,7 +146,7 @@ class KnowledgeAgent:
             f"MANUAL CONTEXT:\n{text_context}\n\n"
             f"HISTORICAL REPAIRS:\n{history_context}"
         )
-    
+
     def _build_procedure_prompt(self, manual_id: str, text_context: str, history_context: str, image_references: list) -> str:
         image_tags = "\n".join([f"  - [IMAGE_{i}] for image reference {i}" for i in range(len(image_references))])
         return (

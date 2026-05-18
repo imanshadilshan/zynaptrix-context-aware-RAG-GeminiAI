@@ -1,5 +1,7 @@
-import google.generativeai as genai
 from unified_rag.config import settings
+from unified_rag.gemini_client import get_client
+
+MODEL = "gemini-2.5-flash"
 
 class SafetyCriticAgent:
     """
@@ -9,30 +11,16 @@ class SafetyCriticAgent:
     """
     def __init__(self):
         self.api_key = settings.gemini_api_key
-        if self.api_key:
-            genai.configure(api_key=self.api_key)
 
     def audit_response(self, text: str) -> str:
-        """
-        Reviews and audits the RAG/Assistant response.
-        If it contains actionable instructions or repair procedures:
-         1. Ensures Lockout/Tagout (LOTO) is enforced.
-         2. Ensures proper PPE is listed.
-         3. Prepends a Safety Seal of Approval.
-        """
         if not self.api_key:
             return text
 
-        # Check if the text actually has steps/procedures. If not, no safety audit is needed
         lower_text = text.lower()
         has_steps = any(kw in lower_text for kw in ["step ", "phase", "procedure", "repair", "fix", "1.", "loto"])
-        
         if not has_steps:
             return text
 
-        genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        
         prompt = (
             "You are a Senior Safety & Compliance Engineer for heavy machinery operations.\n\n"
             "YOUR JOB:\n"
@@ -49,7 +37,7 @@ class SafetyCriticAgent:
         )
 
         try:
-            response = model.generate_content(prompt)
+            response = get_client().models.generate_content(model=MODEL, contents=prompt)
             return response.text.strip()
         except Exception as e:
             print(f"❌ [SafetyCriticAgent] Audit failed: {e}")
