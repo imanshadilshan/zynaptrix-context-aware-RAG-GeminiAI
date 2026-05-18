@@ -15,7 +15,7 @@ if not db_url:
         connect_args={"check_same_thread": False}
     )
 else:
-    print(f"[INFO] Connecting to PostgreSQL database: {db_url.split('@')[-1] if '@' in db_url else db_url}")
+    print("[INFO] Connecting to PostgreSQL database...")
     engine = create_engine(
         db_url,
         pool_pre_ping=True,  # Check connection health before using it
