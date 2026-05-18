@@ -3,59 +3,46 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { 
-  Send, 
-  Bot, 
-  User, 
+import {
+  Send,
+  Bot,
+  User,
   Download,
   AlertTriangle,
-  CheckCircle2,
-  Hammer,
-  Menu,
   Sparkles,
-  HelpCircle,
-  FileText
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '../store/store';
-import { 
-  fetchAssistantSessions, 
-  setActiveAssistantSessionId, 
-  inquireAssistant, 
+import {
+  fetchAssistantSessions,
+  setActiveAssistantSessionId,
+  inquireAssistant,
   exportAssistantSession,
   resetExportProgress,
   fetchAssistantHistory
 } from '../store/slices/copilotSlice';
-import { fetchMachines } from '../store/slices/machineSlice';
 import AssistantSidebar from '../components/AssistantSidebar';
-import AssistantMachineSelector from '../components/AssistantMachineSelector';
 import ExportProgressModal from '../components/ExportProgressModal';
 
 export default function CentralRAGWorkspace() {
   const dispatch = useDispatch<AppDispatch>();
-  
-  // State from Redux
-  const { 
-    chatHistory, 
-    activeAssistantSessionId, 
+
+  const {
+    chatHistory,
+    activeAssistantSessionId,
     isAssistantSidebarOpen,
-    assistantMachineId,
     exportProgress
   } = useSelector((state: RootState) => state.copilot);
-  const { machines } = useSelector((state: RootState) => state.machines);
-  
-  // Local UI States
+
   const [query, setQuery] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
-    dispatch(fetchMachines());
     dispatch(fetchAssistantSessions());
   }, [dispatch]);
 
-  // Scroll to bottom when chat updates
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, activeAssistantSessionId]);
@@ -68,10 +55,8 @@ export default function CentralRAGWorkspace() {
     if (!query.trim()) return;
     const finalQuery = query;
     setQuery('');
-    
     dispatch(inquireAssistant({
       query: finalQuery,
-      machineId: assistantMachineId || undefined,
       sessionId: activeAssistantSessionId || undefined
     }));
   };
@@ -86,20 +71,17 @@ export default function CentralRAGWorkspace() {
   const handleQuickAction = (actionText: string) => {
     dispatch(inquireAssistant({
       query: actionText,
-      machineId: assistantMachineId || undefined,
       sessionId: activeAssistantSessionId || undefined
     }));
   };
 
-  // Convert raw text into markdown, inlining [IMAGE_N] references
   const renderMessageContent = (text: string, images?: string[]) => {
     let processedText = text || "";
-    
-    // Safety Critique Highlights
-    const hasSafetyAlert = processedText.toLowerCase().includes("[safety_alert]") || 
+
+    const hasSafetyAlert = processedText.toLowerCase().includes("[safety_alert]") ||
                            processedText.toLowerCase().includes("loto") ||
                            processedText.toLowerCase().includes("ppe");
-    
+
     if (images && images.length > 0) {
       images.forEach((url, idx) => {
         const tag = new RegExp(`\\[IMAGE[_\s-]?${idx}\\]`, 'gi');
@@ -118,16 +100,15 @@ export default function CentralRAGWorkspace() {
             </div>
           </div>
         )}
-
         <div className="markdown-content">
-          <ReactMarkdown 
-            remarkPlugins={[remarkGfm]} 
-            components={{ 
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
               img: ({node, ...props}) => (
                 <div className="flex flex-col items-center my-4 group">
-                  <img 
-                    {...props} 
-                    className="max-w-full md:max-w-2xl max-h-80 object-contain rounded-xl border border-slate-700 shadow-2xl transition-all duration-300 hover:scale-[1.02]" 
+                  <img
+                    {...props}
+                    className="max-w-full md:max-w-2xl max-h-80 object-contain rounded-xl border border-slate-700 shadow-2xl transition-all duration-300 hover:scale-[1.02]"
                   />
                   <span className="text-[10px] text-slate-500 mt-2 font-bold uppercase tracking-wider">{props.alt || "Diagram Crop"}</span>
                 </div>
@@ -141,38 +122,30 @@ export default function CentralRAGWorkspace() {
     );
   };
 
-  const activeSessionTitle = useMemo(() => {
-    if (!activeAssistantSessionId) return "New Maintenance Query";
-    const session = machines.find(m => m.machine_id === assistantMachineId);
-    return session ? `Copilot: ${session.name} Session` : "Copilot Dialog";
-  }, [activeAssistantSessionId, assistantMachineId, machines]);
-
   if (!isMounted) return null;
 
   return (
     <div className="flex h-[calc(100vh-73px)] overflow-hidden text-slate-200 relative">
-      
-      {/* Dynamic Sidebar Container */}
+
       <AssistantSidebar />
 
-      {/* Primary Chat Box Workspace */}
       <div className="flex-1 flex flex-col h-full bg-[#030712]/30 backdrop-blur-md relative">
-        
-        {/* Workspace Top Header Bar */}
+
+        {/* Header */}
         <div className="border-b border-slate-800 px-6 py-4 flex items-center justify-between bg-slate-950/80 backdrop-blur-md z-10 shadow-lg">
           <div className="flex items-center gap-3">
             <div className="bg-blue-600/10 p-2 rounded-xl border border-blue-500/20 text-blue-400">
               <Sparkles size={16} />
             </div>
             <div>
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">{activeSessionTitle}</h2>
+              <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                {activeAssistantSessionId ? "Copilot Dialog" : "New Maintenance Query"}
+              </h2>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Gemini 2.5 Multi-Agent Engine</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            <AssistantMachineSelector />
-            
             {activeAssistantSessionId && (
               <button
                 onClick={() => dispatch(exportAssistantSession(activeAssistantSessionId))}
@@ -185,30 +158,30 @@ export default function CentralRAGWorkspace() {
           </div>
         </div>
 
-        {/* Message Feed Canvas */}
+        {/* Message Feed */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-800">
           {activeMessages.map((msg, index) => {
             const isAgent = msg.role === 'agent';
             return (
-              <div 
-                key={`msg-${index}`} 
+              <div
+                key={`msg-${index}`}
                 className={`flex gap-4 max-w-4xl ${isAgent ? 'mr-auto' : 'ml-auto flex-row-reverse'}`}
               >
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border shadow-lg ${
-                  isAgent 
-                    ? 'bg-blue-600/10 border-blue-500/30 text-blue-400' 
+                  isAgent
+                    ? 'bg-blue-600/10 border-blue-500/30 text-blue-400'
                     : 'bg-emerald-600/10 border-emerald-500/30 text-emerald-400'
                 }`}>
                   {isAgent ? <Bot size={16} /> : <User size={16} />}
                 </div>
 
                 <div className={`p-5 rounded-2xl border text-sm leading-relaxed shadow-xl relative ${
-                  isAgent 
-                    ? 'bg-slate-900/60 border-slate-800/80 rounded-tl-none' 
+                  isAgent
+                    ? 'bg-slate-900/60 border-slate-800/80 rounded-tl-none'
                     : 'bg-slate-850 border-slate-800 rounded-tr-none'
                 }`}>
                   {renderMessageContent(msg.content, msg.images)}
-                  
+
                   {isAgent && msg.context_source && (
                     <span className="absolute bottom-2 right-4 text-[8px] font-black uppercase tracking-widest text-slate-600 bg-slate-950/40 px-2 py-0.5 rounded-lg border border-slate-800">
                       Context: {msg.context_source}
@@ -221,22 +194,22 @@ export default function CentralRAGWorkspace() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Dynamic Quick Actions Suggestion Tray */}
+        {/* Quick Actions */}
         {activeMessages.length <= 1 && (
           <div className="px-6 py-2 flex flex-wrap gap-2 justify-center max-w-3xl mx-auto">
-            <button 
+            <button
               onClick={() => handleQuickAction("Generate a full maintenance manual checklist.")}
               className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-blue-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-white transition-all"
             >
               🛠️ Checklist Manual
             </button>
-            <button 
+            <button
               onClick={() => handleQuickAction("What are the core LOTO safety rules for these pumps?")}
               className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-amber-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-white transition-all"
             >
               ⚠️ Safety Requirements
             </button>
-            <button 
+            <button
               onClick={() => handleQuickAction("Show structural components and diagrams.")}
               className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:border-teal-500/40 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-white transition-all"
             >
@@ -245,7 +218,7 @@ export default function CentralRAGWorkspace() {
           </div>
         )}
 
-        {/* Dialogue Input Footer Tray */}
+        {/* Input */}
         <div className="p-6 border-t border-slate-850 bg-slate-950/80 backdrop-blur-md">
           <div className="max-w-4xl mx-auto relative flex items-center gap-3">
             <textarea
@@ -272,8 +245,7 @@ export default function CentralRAGWorkspace() {
 
       </div>
 
-      {/* Export Report Progress Modal */}
-      <ExportProgressModal 
+      <ExportProgressModal
         isOpen={exportProgress.isExporting}
         progress={exportProgress.progress}
         status={exportProgress.status}

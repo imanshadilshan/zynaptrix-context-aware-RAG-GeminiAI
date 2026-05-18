@@ -11,7 +11,6 @@ const NavBar = () => {
 
   const navItems = [
     { name: 'Copilot Chat', href: '/', icon: LayoutDashboard },
-    { name: 'Machine Registry', href: '/machines', icon: Cog },
     { name: 'Manual Ingestion', href: '/ingestion', icon: Database },
   ];
 

@@ -13,7 +13,6 @@ load_dotenv()
 from unified_rag.config import settings
 from unified_rag.db.database import engine, Base
 from unified_rag.api.endpoints import router as rag_router
-from app.machine_api import router as machine_router
 from app.assistant_api import router as assistant_router
 
 # Configure logging
@@ -78,7 +77,6 @@ app.add_middleware(
 
 # Mount Router Abstractions
 app.include_router(rag_router)
-app.include_router(machine_router)
 app.include_router(assistant_router)
 
 @app.get("/health")

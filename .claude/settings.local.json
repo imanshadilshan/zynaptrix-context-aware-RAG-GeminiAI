@@ -12,7 +12,12 @@
       "PowerShell($env:PYTHONUTF8 = \"1\"; Set-Location \"E:\\\\Zynaptrix\\\\zynaptrix-context-aware-RAG-GeminiAI\\\\backend\"; & \".\\\\.venv\\\\Scripts\\\\uvicorn.exe\" app.main:app --host 127.0.0.1 --port 8000 --reload 2>&1)",
       "PowerShell(Invoke-RestMethod -Uri \"http://127.0.0.1:8000/\" -Method Get | ConvertTo-Json)",
       "PowerShell(Invoke-RestMethod -Uri \"http://127.0.0.1:8000/docs\" -Method Get | Select-Object -First 3)",
-      "PowerShell($env:PYTHONUTF8 = \"1\"; Set-Location \"E:\\\\Zynaptrix\\\\zynaptrix-context-aware-RAG-GeminiAI\\\\backend\"; & \".\\\\.venv\\\\Scripts\\\\python.exe\" -c \"from app.main import app; print\\('Import OK'\\)\" 2>&1)"
+      "PowerShell($env:PYTHONUTF8 = \"1\"; Set-Location \"E:\\\\Zynaptrix\\\\zynaptrix-context-aware-RAG-GeminiAI\\\\backend\"; & \".\\\\.venv\\\\Scripts\\\\python.exe\" -c \"from app.main import app; print\\('Import OK'\\)\" 2>&1)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell($env:PYTHONUTF8 = \"1\"; Set-Location \"E:\\\\Zynaptrix\\\\zynaptrix-context-aware-RAG-GeminiAI\\\\backend\"; & \".\\\\.venv\\\\Scripts\\\\python.exe\" -c \"from app.main import app; print\\('OK'\\)\" 2>&1)",
+      "Bash(Get-ChildItem -Path \"E:\\\\Zynaptrix\\\\zynaptrix-context-aware-RAG-GeminiAI\\\\frontend\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
     ]
   }
 }
