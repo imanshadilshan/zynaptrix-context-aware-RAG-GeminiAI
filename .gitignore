@@ -1,0 +1,56 @@
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+pyvenv.cfg
+.python-version
+
+# Python caching & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# AI weights and large binary models
+*.pt
+*.pth
+*.bin
+*.onnx
+
+# Node/Next.js dependencies and builds
+node_modules
+.next/
+out/
+build/
+dist/
+.docusaurus/
+.cache/
+
+# Local databases and SQLite
+*.db
+*.sqlite3
+local_rag.db
+
+# OS files & User directories
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
